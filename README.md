@@ -68,11 +68,19 @@ Penggunaan: Penggunaan enkripsi homomorfik terutama untuk aplikasi komputasi awa
 
 Rangkuman Jenis Enkripsi:
 -Enkripsi Simetris: Menggunakan kunci yang sama untuk enkripsi dan dekripsi (AES, DES).
+
 -Enkripsi Asimetris: Menggunakan kunci publik untuk enkripsi dan kunci privat untuk dekripsi (RSA, ECC).
+
 -Enkripsi Hybrid: Menggabungkan enkripsi simetris dan asimetris (TLS/SSL).
+
 -Stream Cipher: Mengenkripsi bit per bit (RC4, ChaCha20).
+
 -Block Cipher: Mengenkripsi data dalam blok (AES, Blowfish).
+
 -Substitusi & Transposisi: Mengubah karakter atau posisi dalam teks (Caesar Cipher, Rail Fence).
+
 -Enkripsi Kuantum: Menggunakan fisika kuantum untuk komunikasi aman.
+
 -Homomorphic Encryption: Perhitungan pada ciphertext tanpa perlu mendekripsi.
+
 Setiap metode enkripsi memiliki kelebihan dan kekurangannya sendiri dan dipilih berdasarkan kebutuhan keamanan serta kinerja sistem.
