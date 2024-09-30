@@ -1,24 +1,29 @@
 import numpy as np
 import base64
 
+# Fungsi untuk membersihkan teks dari karakter non-alfabet
 def clean_text(text):
     return ''.join([char.lower() for char in text if char.isalpha()])
 
+# Mengubah karakter menjadi angka (0-25)
 def char_to_num(c):
     return ord(c) - ord('a')
 
+# Mengubah angka menjadi karakter
 def num_to_char(n):
     return chr(n + ord('a'))
 
+# Membagi teks menjadi blok dengan ukuran tertentu
 def text_to_blocks(text, block_size):
     while len(text) % block_size != 0:
-        text += 'x'  
+        text += 'x'  # Mengisi teks dengan 'x' agar panjangnya kelipatan dari block_size
     blocks = []
     for i in range(0, len(text), block_size):
         block = text[i:i + block_size]
         blocks.append([char_to_num(c) for c in block])  
     return blocks
 
+# Enkripsi menggunakan Hill Cipher
 def hill_encrypt(plain_text, key_matrix):
     block_size = len(key_matrix)
     clean_plain_text = clean_text(plain_text) 
@@ -26,69 +31,80 @@ def hill_encrypt(plain_text, key_matrix):
 
     cipher_text = ''
     for block in blocks:
-        result = np.dot(key_matrix, block) % 26  
+        result = np.dot(key_matrix, block) % 26  # Menghitung hasil enkripsi
         cipher_text += ''.join([num_to_char(num) for num in result])  
 
     return cipher_text
 
+# Dekripsi menggunakan Hill Cipher
 def hill_decrypt(cipher_text, inverse_key_matrix, block_size):
     blocks = text_to_blocks(cipher_text, block_size)  
 
     plain_text = ''
     for block in blocks:
-        result = np.dot(inverse_key_matrix, block) % 26  
+        result = np.dot(inverse_key_matrix, block) % 26  # Menghitung hasil dekripsi
         plain_text += ''.join([num_to_char(num) for num in result])  
 
     return plain_text
 
+# Menghitung invers modulo
 def mod_inverse(a, m):
     for x in range(1, m):
         if (a * x) % m == 1:
             return x
     return None  
 
-
+# Membuat matriks kunci dari kunci yang diberikan
 def create_key_matrix(key, block_size):
     key = clean_text(key) 
     if len(key) < block_size ** 2:
         raise ValueError("Kunci tidak cukup panjang.")  
-    
     matrix = []
     for i in range(block_size ** 2):
         matrix.append(char_to_num(key[i]))  
 
     return np.array(matrix).reshape(block_size, block_size)  
 
+# Menghitung invers dari matriks
 def inverse_matrix(matrix):
     det = int(np.round(np.linalg.det(matrix))) % 26  
     det_inv = mod_inverse(det, 26)  
-    
     if det_inv is None:
         raise ValueError(f"Kunci tidak memiliki invers. Determinan: {det}")  
-    
     matrix_mod_inv = det_inv * np.round(det * np.linalg.inv(matrix)).astype(int) % 26  
     return matrix_mod_inv
 
+# Mengubah teks menjadi format base64
 def to_base64(text):
     return base64.b64encode(text.encode()).decode() 
+
+# Membaca file dalam bentuk biner
 def read_file_as_binary(filename):
     with open(filename, 'rb') as f:
         return f.read()
+
+# Menyimpan konten ke dalam file
 def save_to_file(filename, content):
     with open(filename, 'wb') as f:
         f.write(content) 
 
+# Mengenkripsi file biner
 def encrypt_binary_file(file_bytes, key_matrix):
     plain_text = ''.join([num_to_char(b % 26) for b in file_bytes])
     cipher_text = hill_encrypt(plain_text, key_matrix)
     return cipher_text.encode()  
 
-# Fungsi untuk mendekripsi file biner
+# Mendekripsi file biner
 def decrypt_binary_file(encrypted_bytes, inverse_key_matrix, block_size):
     cipher_text = encrypted_bytes.decode()  
     plain_text = hill_decrypt(cipher_text, inverse_key_matrix, block_size)  
     return bytes([char_to_num(c) for c in plain_text])  
 
+# Fungsi untuk mencetak matriks
+def print_matrix(matrix, name):
+    print(f"\n{name}:\n{matrix}")
+
+# Fungsi utama untuk menjalankan program
 def main():
     print("1. Ketik pesan")
     print("2. Baca dari file")
@@ -107,11 +123,18 @@ def main():
 
         key_matrix = create_key_matrix(key, block_size)  
 
-        try:
-            inverse_key_matrix = inverse_matrix(key_matrix)
-        except ValueError as e:
-            print(e)  
-            return
+        # Perulangan untuk memastikan kunci memiliki invers
+        while True:
+            try:
+                inverse_key_matrix = inverse_matrix(key_matrix)
+                break  # Keluar dari perulangan jika invers ditemukan
+            except ValueError as e:
+                print(e)
+                key = input("Masukkan kunci baru: ")
+                while len(key) < block_size ** 2:
+                    print(f"Kunci harus memiliki panjang minimal {block_size ** 2}.")
+                    key = input("Masukkan kunci (panjang kunci harus cukup): ")
+                key_matrix = create_key_matrix(key, block_size)  
 
         cipher_text = hill_encrypt(plain_text, key_matrix)  
         base64_cipher_text = to_base64(cipher_text)  
@@ -120,8 +143,12 @@ def main():
         decrypted_text = hill_decrypt(cipher_text, inverse_key_matrix, block_size) 
         print("\nPesan yang didekripsi:", decrypted_text)
 
+        # Menampilkan matriks
+        print_matrix(key_matrix, "Matriks Kunci ")
+        print_matrix(inverse_key_matrix, "Matriks Invers Kunci ")
+
         save_to_file('encrypted_text_hillchiper.txt', cipher_text.encode())
-        print("Ciphertext disimpan sebagai 'encrypted_text_hillchiper.txt'")
+        print("\nCiphertext disimpan sebagai 'encrypted_text_hillchiper.txt'")
 
     elif choice == '2':
         file_path = input("Masukkan path file: ")
@@ -131,20 +158,35 @@ def main():
             print(f"Kunci harus memiliki panjang minimal {block_size ** 2}.")
             key = input("Masukkan kunci (panjang kunci harus cukup): ")
 
-        file_bytes = read_file_as_binary(file_path)  
-
         key_matrix = create_key_matrix(key, block_size) 
 
-        inverse_key_matrix = inverse_matrix(key_matrix) 
+        # Perulangan untuk memastikan kunci memiliki invers
+        while True:
+            try:
+                inverse_key_matrix = inverse_matrix(key_matrix)
+                break  # Keluar dari perulangan jika invers ditemukan
+            except ValueError as e:
+                print(e)
+                key = input("Masukkan kunci baru: ")
+                while len(key) < block_size ** 2:
+                    print(f"Kunci harus memiliki panjang minimal {block_size ** 2}.")
+                    key = input("Masukkan kunci (panjang kunci harus cukup): ")
+                key_matrix = create_key_matrix(key, block_size) 
+
+        file_bytes = read_file_as_binary(file_path)  
 
         encrypted_bytes = encrypt_binary_file(file_bytes, key_matrix)  
 
-        save_to_file('encrypted_file_hillchiper.txt', encrypted_bytes)  
-        print("File terenkripsi disimpan sebagai 'encrypted_file_hillchiper.txt'")
+        save_to_file('encrypted_file_hillchiper.bin', encrypted_bytes)  
+        print("\nFile terenkripsi disimpan sebagai 'encrypted_file_hillchiper.bin'")
 
         decrypted_bytes = decrypt_binary_file(encrypted_bytes, inverse_key_matrix, block_size) 
         save_to_file('decrypted_file_hillchiper.txt', decrypted_bytes)  
-        print("File yang didekripsi disimpan sebagai 'decrypted_file_hillchiper.txt'")
+        print("\nFile yang didekripsi disimpan sebagai 'decrypted_file_hillchiper.txt'")
+
+        # Menampilkan matriks
+        print_matrix(key_matrix, "Matriks Kunci")
+        print_matrix(inverse_key_matrix, "Matriks Invers Kunci")
 
 if __name__ == "__main__":
     main()

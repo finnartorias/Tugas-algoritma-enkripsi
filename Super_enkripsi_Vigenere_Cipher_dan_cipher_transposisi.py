@@ -56,7 +56,7 @@ def columnar_transposition_decrypt(cipher_text, key):
     key_order = sorted(range(len(key)), key=lambda x: key[x])
     column_count = len(key)
     row_count = len(cipher_text) // column_count + (1 if len(cipher_text) % column_count != 0 else 0)
-    
+
     # Buat array untuk menyimpan kolom
     columns = [''] * column_count
     start = 0
@@ -94,6 +94,11 @@ def save_to_file(filename, content):
     with open(filename, 'wb') as f:
         f.write(content)
 
+# Fungsi untuk menyimpan hasil ke file teks
+def save_to_text_file(filename, content):
+    with open(filename, 'w') as f:
+        f.write(content)
+
 # Fungsi utama
 def main():
     print("1. Ketik pesan")
@@ -105,6 +110,15 @@ def main():
         key = input("Masukkan kunci: ")
         cipher_text = super_encrypt(plain_text, key)
         print("\nCiphertext (Base64):", to_base64(cipher_text))
+
+        # Simpan hasil enkripsi ke file
+        save_to_text_file('encrypted_output.txt', cipher_text)
+        print("Ciphertext disimpan sebagai 'encrypted_output.txt'")
+
+        # Dekripsi dan simpan ke file
+        decrypted_text = super_decrypt(cipher_text, key)
+        save_to_text_file('decrypted_output.txt', decrypted_text)
+        print("Decrypted text disimpan sebagai 'decrypted_output.txt'")
 
     elif choice == '2':
         file_path = input("Masukkan path file: ")
@@ -123,7 +137,7 @@ def main():
 
         # Dekripsi
         decrypted_text = super_decrypt(cipher_text, key)
-        save_to_file('decrypted_file.txt', decrypted_text.encode())
+        save_to_text_file('decrypted_file.txt', decrypted_text)
         print("File yang didekripsi disimpan sebagai 'decrypted_file.txt'")
 
 if __name__ == "__main__":
