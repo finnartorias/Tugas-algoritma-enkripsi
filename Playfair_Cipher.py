@@ -1,146 +1,139 @@
 import base64
 
-def clean_text(text):
-    return ''.join([char.lower() for char in text if char.isalpha()])
-def create_playfair_matrix(key):
-    alphabet = 'abcdefghiklmnopqrstuvwxyz'
-    matrix = []
-    used_chars = set()
+# Fungsi untuk membangun tabel kunci untuk Playfair Cipher
+def create_key_table(key):
+    key = key.upper().replace("J", "I")  # Menggantikan J dengan I
+    key_table = []
+    seen = set()
 
-    for char in key.lower():
-        if char not in used_chars and char in alphabet:
-            matrix.append(char)
-            used_chars.add(char)
+    for char in key:
+        if char not in seen and char.isalpha():
+            seen.add(char)
+            key_table.append(char)
 
-    for char in alphabet:
-        if char not in used_chars:
-            matrix.append(char)
+    for char in "ABCDEFGHIKLMNOPQRSTUVWXYZ":
+        if char not in seen:
+            key_table.append(char)
 
-    return [matrix[i:i + 5] for i in range(0, 25, 5)]
+    return key_table
 
-def get_char_position(matrix, char):
-    for row in range(5):
-        for col in range(5):
-            if matrix[row][col] == char:
-                return row, col
-    return None
-
-def process_pair(matrix, char1, char2, mode='encrypt'):
-    row1, col1 = get_char_position(matrix, char1)
-    row2, col2 = get_char_position(matrix, char2)
-    if row1 == row2:
-        if mode == 'encrypt':
-            return matrix[row1][(col1 + 1) % 5] + matrix[row2][(col2 + 1) % 5]
-        else:
-            return matrix[row1][(col1 - 1) % 5] + matrix[row2][(col2 - 1) % 5]
-    elif col1 == col2:
-        if mode == 'encrypt':
-            return matrix[(row1 + 1) % 5][col1] + matrix[(row2 + 1) % 5][col2]
-        else:
-            return matrix[(row1 - 1) % 5][col1] + matrix[(row2 - 1) % 5][col2]
-    else:
-        return matrix[row1][col2] + matrix[row2][col1]
-
-def prepare_plaintext(text):
-    prepared_text = ''
+# Fungsi untuk membagi teks menjadi pasangan
+def prepare_text(text):
+    text = text.upper().replace("J", "I").replace(" ", "")  # Menggantikan J dengan I dan menghapus spasi
+    prepared_text = []
+    
     i = 0
     while i < len(text):
-        char1 = text[i]
-        char2 = text[i + 1] if i + 1 < len(text) else 'x'
-        
-        if char1 == char2:
-            prepared_text += char1 + 'x'
-            i += 1
+        if i + 1 < len(text):
+            if text[i] == text[i + 1]:  # Jika pasangan sama, tambahkan X
+                prepared_text.append(text[i] + 'X')
+                i += 1
+            else:
+                prepared_text.append(text[i] + text[i + 1])
+                i += 2
         else:
-            prepared_text += char1 + char2
-            i += 2
-
-    if len(prepared_text) % 2 != 0:
-        prepared_text += 'x'
+            prepared_text.append(text[i] + 'X')  # Jika satu karakter tersisa
+            i += 1
     
     return prepared_text
 
-def playfair_encrypt(plain_text, key):
-    clean_plain_text = clean_text(plain_text).replace('j', 'i') 
-    prepared_text = prepare_plaintext(clean_plain_text)
-    matrix = create_playfair_matrix(key)
-    
-    cipher_text = ''
-    for i in range(0, len(prepared_text), 2):
-        cipher_text += process_pair(matrix, prepared_text[i], prepared_text[i + 1], mode='encrypt')
-    
-    return cipher_text
+# Fungsi untuk mendapatkan posisi karakter dalam tabel kunci
+def get_position(char, key_table):
+    index = key_table.index(char)
+    return index // 5, index % 5  # Baris dan kolom
 
-def playfair_decrypt(cipher_text, key):
-    matrix = create_playfair_matrix(key)
-    
-    plain_text = ''
-    for i in range(0, len(cipher_text), 2):
-        plain_text += process_pair(matrix, cipher_text[i], cipher_text[i + 1], mode='decrypt')
-    
-    return plain_text
+# Fungsi untuk enkripsi menggunakan Playfair Cipher
+def encrypt_playfair(plaintext, key):
+    key_table = create_key_table(key)
+    prepared_text = prepare_text(plaintext)
+    ciphertext = []
 
-def to_base64(text):
-    return base64.b64encode(text.encode()).decode()
+    for pair in prepared_text:
+        row1, col1 = get_position(pair[0], key_table)
+        row2, col2 = get_position(pair[1], key_table)
 
-def read_file_as_binary(filename):
-    with open(filename, 'rb') as f:
-        return f.read()
+        if row1 == row2:  # Jika dalam baris yang sama
+            ciphertext.append(key_table[row1 * 5 + (col1 + 1) % 5])
+            ciphertext.append(key_table[row2 * 5 + (col2 + 1) % 5])
+        elif col1 == col2:  # Jika dalam kolom yang sama
+            ciphertext.append(key_table[((row1 + 1) % 5) * 5 + col1])
+            ciphertext.append(key_table[((row2 + 1) % 5) * 5 + col2])
+        else:  # Jika membentuk persegi
+            ciphertext.append(key_table[row1 * 5 + col2])
+            ciphertext.append(key_table[row2 * 5 + col1])
 
-def save_to_file(filename, content):
-    with open(filename, 'wb') as f:
-        f.write(content)
+    return ''.join(ciphertext)
 
-def encrypt_binary_file(file_bytes, key):
-    cipher_bytes = bytearray()
-    key = key.encode('utf-8') 
-    for i, byte in enumerate(file_bytes):
-        encrypted_byte = (byte + key[i % len(key)]) % 256  
-        cipher_bytes.append(encrypted_byte)
-    return cipher_bytes
+# Fungsi untuk dekripsi menggunakan Playfair Cipher
+def decrypt_playfair(ciphertext, key):
+    key_table = create_key_table(key)
+    prepared_text = prepare_text(ciphertext)
+    plaintext = []
 
-def decrypt_binary_file(cipher_bytes, key):
-    plain_bytes = bytearray()
-    key = key.encode('utf-8')  
-    for i, byte in enumerate(cipher_bytes):
-        decrypted_byte = (byte - key[i % len(key)]) % 256  
-        plain_bytes.append(decrypted_byte)
-    return plain_bytes
+    for pair in prepared_text:
+        row1, col1 = get_position(pair[0], key_table)
+        row2, col2 = get_position(pair[1], key_table)
 
+        if row1 == row2:  # Jika dalam baris yang sama
+            plaintext.append(key_table[row1 * 5 + (col1 - 1) % 5])
+            plaintext.append(key_table[row2 * 5 + (col2 - 1) % 5])
+        elif col1 == col2:  # Jika dalam kolom yang sama
+            plaintext.append(key_table[((row1 - 1) % 5) * 5 + col1])
+            plaintext.append(key_table[((row2 - 1) % 5) * 5 + col2])
+        else:  # Jika membentuk persegi
+            plaintext.append(key_table[row1 * 5 + col2])
+            plaintext.append(key_table[row2 * 5 + col1])
+
+    return ''.join(plaintext)
+
+# Fungsi untuk menyimpan ke file dengan encoding base64
+def save_to_file(filename, data):
+    encoded_data = base64.b64encode(data.encode()).decode()
+    with open(filename, 'w') as file:
+        file.write(encoded_data)
+
+# Fungsi untuk membaca dari file dengan decoding base64
+def read_from_file(filename):
+    with open(filename, 'r') as file:
+        encoded_data = file.read()
+    decoded_data = base64.b64decode(encoded_data).decode()
+    return decoded_data
+
+# Fungsi utama untuk meminta input pengguna dan menjalankan enkripsi/dekripsi
 def main():
-    print("1. Ketik pesan")
-    print("2. Baca dari file")
-    choice = input("\nPilih metode input (1/2): ")
+    while True:
+        print("Selamat datang di Opsi Playfair Cipher \n")
+        print("1. Enkripsi Pesan")
+        print("2. Dekripsi Pesan")
+        print("3. Keluar\n")
 
-    if choice == '1':
-        plain_text = input("\nMasukkan pesan: ")
-        key = input("Masukkan kunci: ")
+        choice = input("\nPilih opsi (1-3): ")
+        
+        if choice == '1':
+            plaintext = input("\nMasukkan teks yang akan dienkripsi: ")
+            key = input("Masukkan kunci: \n")
 
-        cipher_text = playfair_encrypt(plain_text, key)
-        base64_cipher_text = to_base64(cipher_text)
-        print("\nCiphertext (Base64):", base64_cipher_text.upper())
+            ciphertext = encrypt_playfair(plaintext, key)
+            print("Hasil Enkripsi:", ciphertext)
 
-        decrypted_text = playfair_decrypt(cipher_text, key)
-        print("\nPesan yang didekripsi:", decrypted_text)
+            filename = input("\nMasukkan nama file untuk menyimpan hasil enkripsi (misal: ciphertext.txt): \n")
+            save_to_file(filename, ciphertext)
+            print(f"Hasil enkripsi telah disimpan ke file '{filename}' dalam format base64.\n")
+        
+        elif choice == '2':
+            filename = input("\nMasukkan nama file yang berisi teks terenkripsi (misal: ciphertext.txt): \n")
+            key = input("Masukkan kunci: ")
 
-        save_to_file('encrypted_text_playfair.txt', cipher_text.encode())
-        print("Ciphertext disimpan sebagai 'encrypted_text_playfair.txt'")
-
-    elif choice == '2':
-        file_path = input("Masukkan path file: ")
-        key = input("Masukkan kunci: ")
-
-        file_bytes = read_file_as_binary(file_path)
-
-        encrypted_bytes = encrypt_binary_file(file_bytes, key)
-
-        save_to_file('encrypted_file_playfair.txt', encrypted_bytes)
-        print("File terenkripsi disimpan sebagai 'encrypted_file_playfair.txt'")
-
-        decrypted_bytes = decrypt_binary_file(encrypted_bytes, key)
-        save_to_file('decrypted_file_playfair.txt', decrypted_bytes)
-        print("File yang didekripsi disimpan sebagai 'decrypted_file_playfair.txt'")
+            ciphertext_from_file = read_from_file(filename)
+            decrypted_text = decrypt_playfair(ciphertext_from_file, key)
+            print("Hasil Dekripsi:", decrypted_text)
+        
+        elif choice == '3':
+            print("\nKeluar dari program. Terima kasih!")
+            return 
+        
+        else:
+            print("Pilihan tidak valid. Silakan coba lagi.")
 
 if __name__ == "__main__":
     main()
-
