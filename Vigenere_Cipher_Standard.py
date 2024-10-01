@@ -40,7 +40,7 @@ def main():
             save_to_file(f"{filename}.txt", decrypted_text)
 
         elif pilihan == 3:
-            print("Keluar dari program. Terima kasih!")
+            print("\nKeluar dari program. Terima kasih!")
             return
 
         else:
