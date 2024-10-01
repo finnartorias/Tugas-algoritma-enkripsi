@@ -1,4 +1,6 @@
 import base64
+
+# Fungsi untuk enkripsi menggunakan Vigenère Autokey Cipher
 def encrypt_vigenere_autokey(plaintext, key):
     ciphertext = []
     key = key + plaintext  
@@ -15,6 +17,7 @@ def encrypt_vigenere_autokey(plaintext, key):
     
     return ''.join(ciphertext)
 
+# Fungsi untuk dekripsi menggunakan Vigenère Autokey Cipher
 def decrypt_vigenere_autokey(ciphertext, key):
     plaintext = []
     
@@ -31,17 +34,20 @@ def decrypt_vigenere_autokey(ciphertext, key):
     
     return ''.join(plaintext)
 
+# Fungsi untuk menyimpan ke file dengan encoding base64
 def save_to_file(filename, data):
     encoded_data = base64.b64encode(data.encode()).decode()  
     with open(filename, 'w') as file:
         file.write(encoded_data)
 
+# Fungsi untuk membaca dari file dengan decoding base64
 def read_from_file(filename):
     with open(filename, 'r') as file:
         encoded_data = file.read()
     decoded_data = base64.b64decode(encoded_data).decode()  
     return decoded_data
 
+# Fungsi utama untuk meminta input pengguna dan menjalankan enkripsi/dekripsi
 def main():
     while True:
         print("Selamat datang di Opsi Vinegere autokey \n")
@@ -71,8 +77,8 @@ def main():
             print("Hasil Dekripsi:", decrypted_text)
         
         elif choice == '3':
-            print("Keluar dari program. Terima kasih!")
-            return
+            print("\nKeluar dari program. Terima kasih!")
+            return  
         
         else:
             print("Pilihan tidak valid. Silakan coba lagi.")
