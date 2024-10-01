@@ -1,202 +1,121 @@
-import math
-import string
-import sys
+import base64
 import numpy as np
-from sympy import Matrix
 
+def mod_inverse(a, m):
+    """Menghitung invers modulo dari a terhadap m menggunakan Extended Euclidean Algorithm."""
+    m0, x0, x1 = m, 0, 1
+    if m == 1:
+        return 0
+    while a > 1:
+        quotient = a // m
+        m, a = a % m, m
+        x0, x1 = x1 - quotient * x0, x0
+    return x1 + m0 if x1 < 0 else x1
 
-def menu():
-    while True:
-        print("---- Hill Cipher ----\n")
-        print("1) Enkripsi Pesan.")
-        print("2) Dekripsi Pesan.")
-        print("3) Serangan Ciphertext (Serangan Teks Dikenal).")
-        print("4) Keluar.\n")
-        try:
-            pilihan = int(input("Pilih fungsi yang ingin dijalankan: "))
-            if 1 <= pilihan <= 4:
-                return pilihan
-            else:
-                print("\nAnda harus memasukkan angka dari 1 hingga 4\n")
-        except ValueError:
-            print("\nAnda harus memasukkan angka dari 1 hingga 4\n")
-        input("Tekan Enter untuk melanjutkan.\n")
+def create_key_matrix(key):
+    """Membuat matriks kunci dari string kunci."""
+    key = key.replace(" ", "").upper()
+    size = int(len(key) ** 0.5)
+    key_matrix = []
+    
+    for i in range(size):
+        row = []
+        for j in range(size):
+            row.append(ord(key[i * size + j]) - 65)  # Konversi huruf ke angka
+        key_matrix.append(row)
+    
+    return np.array(key_matrix)
 
+def encrypt(plaintext, key):
+    """Enkripsi teks menggunakan Hill Cipher."""
+    key_matrix = create_key_matrix(key)
+    size = key_matrix.shape[0]
+    
+    # Menyiapkan plaintext
+    plaintext = plaintext.replace(" ", "").upper()
+    while len(plaintext) % size != 0:
+        plaintext += "X"  # Tambahkan 'X' jika panjang plaintext tidak kelipatan ukuran kunci
+    
+    # Enkripsi
+    ciphertext = []
+    for i in range(0, len(plaintext), size):
+        block = plaintext[i:i+size]
+        block_vector = np.array([ord(char) - 65 for char in block]).reshape(size, 1)
+        encrypted_block = np.dot(key_matrix, block_vector) % 26
+        ciphertext.extend([chr(num + 65) for num in encrypted_block.flatten()])
+    
+    return ''.join(ciphertext)
 
-# Buat dua kamus, alfabet bahasa Inggris ke angka dan angka ke alfabet bahasa Inggris, lalu kembalikan
-def get_alphabet():
-    alphabet = {char: index for index, char in enumerate(string.ascii_uppercase)}
-    reverse_alphabet = {index: char for char, index in alphabet.items()}
-    return alphabet, reverse_alphabet
+def decrypt(ciphertext, key):
+    """Dekripsi teks menggunakan Hill Cipher."""
+    key_matrix = create_key_matrix(key)
+    size = key_matrix.shape[0]
+    
+    # Menghitung invers kunci
+    determinant = int(np.round(np.linalg.det(key_matrix))) % 26
+    determinant_inverse = mod_inverse(determinant, 26)
+    adjugate_matrix = np.round(determinant_inverse * np.linalg.inv(key_matrix) * determinant).astype(int) % 26
+    
+    # Menyiapkan ciphertext
+    ciphertext = ciphertext.replace(" ", "").upper()
+    
+    # Dekripsi
+    plaintext = []
+    for i in range(0, len(ciphertext), size):
+        block = ciphertext[i:i+size]
+        block_vector = np.array([ord(char) - 65 for char in block]).reshape(size, 1)
+        decrypted_block = np.dot(adjugate_matrix, block_vector) % 26
+        plaintext.extend([chr(num + 65) for num in decrypted_block.flatten()])
+    
+    return ''.join(plaintext)
 
+def save_to_file(filename, data):
+    """Menyimpan data ke file dengan encoding base64."""
+    encoded_data = base64.b64encode(data.encode()).decode()
+    with open(filename, 'w') as file:
+        file.write(encoded_data)
 
-# Ambil input dari pengguna dan periksa apakah sesuai dengan alfabet
-def get_text_input(pesan, alphabet):
-    while True:
-        teks = input(pesan).upper()
-        if all(char in alphabet for char in teks):
-            return teks
-        else:
-            print("\nTeks hanya boleh berisi karakter dari alfabet bahasa Inggris ([A-Z]).")
-
-
-# Periksa apakah kunci berbentuk kuadrat
-def is_square(kunci):
-    kunci_length = len(kunci)
-    return kunci_length >= 2 and kunci_length == int(math.sqrt(kunci_length)) ** 2
-
-
-# Buat matriks k untuk kunci
-def get_key_matrix(kunci, alphabet):
-    k = np.array([alphabet[char] for char in kunci])
-    m = int(math.sqrt(len(k)))
-    return np.reshape(k, (m, m))
-
-
-# Buat matriks m-gram dari teks, jika perlu, lengkapi m-gram terakhir dengan huruf terakhir dari alfabet
-def get_text_matrix(teks, m, alphabet):
-    matriks = [alphabet[char] for char in teks]
-    remainder = len(matriks) % m
-    if remainder != 0:
-        matriks.extend([25] * (m - remainder))
-    return np.reshape(matriks, (len(matriks) // m, m)).T
-
-
-# Enkripsi Pesan dan kembalikan matriks ciphertext
-def encrypt(kunci, plaintext, alphabet):
-    m = kunci.shape[0]
-    m_grams = plaintext.shape[1]
-    ciphertext = np.zeros((m, m_grams), dtype=int)
-    for i in range(m_grams):
-        ciphertext[:, i] = np.reshape(np.dot(kunci, plaintext[:, i]) % len(alphabet), m)
-    return ciphertext
-
-
-# Transformasi matriks menjadi teks, sesuai dengan alfabet
-def matrix_to_text(matriks, urutan, alphabet):
-    text_array = np.ravel(matriks, order='F') if urutan == 't' else np.ravel(matriks)
-    return ''.join(alphabet[i] for i in text_array)
-
-
-# Periksa apakah kunci dapat dibalik dan dalam hal ini kembalikan invers matriks
-def get_inverse(matriks, alphabet):
-    if math.gcd(int(round(np.linalg.det(matriks))), len(alphabet)) == 1:
-        matriks = Matrix(matriks)
-        return np.matrix(matriks.inv_mod(len(alphabet)))
-    return None
-
-
-# Dekripsi Pesan dan kembalikan matriks plaintext
-def decrypt(k_inverse, c, alphabet):
-    return encrypt(k_inverse, c, alphabet)
-
-
-def get_m():
-    while True:
-        try:
-            m = int(input("Masukkan panjang gram (m): "))
-            if m >= 2:
-                return m
-            else:
-                print("\nAnda harus memasukkan angka m >= 2\n")
-        except ValueError:
-            print("\nAnda harus memasukkan angka m >= 2\n")
-
-
-# Serangan Ciphertext (Serangan Teks Dikenal)
-def plaintext_attack(c, p_inverse, alphabet):
-    return encrypt(c, p_inverse, alphabet)
-
+def read_from_file(filename):
+    """Membaca data dari file dengan decoding base64."""
+    with open(filename, 'r') as file:
+        encoded_data = file.read()
+    decoded_data = base64.b64decode(encoded_data).decode()
+    return decoded_data
 
 def main():
     while True:
-        pilihan = menu()
-        alphabet, reverse_alphabet = get_alphabet()
+        print("Selamat datang di opsi Hill Cipher\n")
+        print("1. Enkripsi Pesan")
+        print("2. Dekripsi Pesan")
+        print("3. Keluar")
 
-        if pilihan == 1:
-            # Ambil plaintext dan kunci untuk enkripsi
-            plaintext = get_text_input("\nMasukkan teks yang akan dienkripsi: ", alphabet)
-            kunci = get_text_input("Masukkan kunci untuk enkripsi: ", alphabet)
+        choice = input("\nPilih opsi (1-3): ")
+        
+        if choice == '1':
+            plaintext = input("\nMasukkan teks yang akan dienkripsi: ")
+            key = input("Masukkan kunci (harus berbentuk kuadrat, misal: 'HILLKEY'): ")
 
-            if is_square(kunci):
-                k = get_key_matrix(kunci, alphabet)
-                print("\nMatriks Kunci:\n", k)
-                p = get_text_matrix(plaintext, k.shape[0], alphabet)
-                print("Matriks Plaintext:\n", p)
+            ciphertext = encrypt(plaintext, key)
+            print("Hasil Enkripsi:", ciphertext)
 
-                input("\nTekan Enter untuk memulai enkripsi.")
-                c = encrypt(k, p, alphabet)
-                ciphertext = matrix_to_text(c, "t", reverse_alphabet)
+            filename = input("\nMasukkan nama file untuk menyimpan hasil enkripsi (misal: ciphertext.txt): ")
+            save_to_file(filename, ciphertext)
+            print(f"Hasil enkripsi telah disimpan ke file '{filename}' dalam format base64.")
+        
+        elif choice == '2':
+            filename = input("\nMasukkan nama file yang berisi teks terenkripsi (misal: ciphertext.txt): ")
+            key = input("Masukkan kunci (harus berbentuk kuadrat, misal: 'HILLKEY'): ")
 
-                print("\nPesan telah dienkripsi.\n")
-                print("Ciphertext yang dihasilkan: ", ciphertext)
-                print("Matriks Ciphertext yang dihasilkan:\n", c, "\n")
-            else:
-                print("\nPanjang kunci harus berbentuk kuadrat dan >= 2.\n")
+            ciphertext_from_file = read_from_file(filename)
+            decrypted_text = decrypt(ciphertext_from_file, key)
+            print("Hasil Dekripsi:", decrypted_text)
+        
+        elif choice == '3':
+            print("Keluar dari program. Terima kasih!")
+            break  # Keluar dari loop dan program
+        
+        else:
+            print("Pilihan tidak valid. Silakan coba lagi.")
 
-        elif pilihan == 2:
-            # Ambil ciphertext dan kunci untuk dekripsi
-            ciphertext = get_text_input("\nMasukkan ciphertext yang akan didekripsi: ", alphabet)
-            kunci = get_text_input("Masukkan kunci untuk dekripsi: ", alphabet)
-
-            if is_square(kunci):
-                k = get_key_matrix(kunci, alphabet)
-                k_inverse = get_inverse(k, alphabet)
-
-                if k_inverse is not None:
-                    c = get_text_matrix(ciphertext, k_inverse.shape[0], alphabet)
-                    print("\nMatriks Kunci:\n", k)
-                    print("Matriks Ciphertext:\n", c)
-
-                    input("\nTekan Enter untuk memulai dekripsi.")
-                    p = decrypt(k_inverse, c, alphabet)
-                    plaintext = matrix_to_text(p, "t", reverse_alphabet)
-
-                    print("\nPesan telah didekripsi.\n")
-                    print("Plaintext yang dihasilkan: ", plaintext)
-                    print("Matriks Plaintext yang dihasilkan:\n", p, "\n")
-                else:
-                    print("\nMatriks kunci yang diberikan tidak dapat dibalik.\n")
-            else:
-                print("\nKunci harus berbentuk kuadrat dan berukuran >= 2.\n")
-
-        elif pilihan == 3:
-            # Ambil plaintext dan ciphertext untuk serangan
-            plaintext = get_text_input("\nMasukkan plaintext untuk serangan: ", alphabet)
-            ciphertext = get_text_input("Masukkan ciphertext dari plaintext untuk serangan: ", alphabet)
-
-            m = get_m()
-            if len(plaintext) / m >= m:
-                p = get_text_matrix(plaintext, m, alphabet)
-                p = p[:, 0:m]
-                p_inverse = get_inverse(p, alphabet)
-
-                if p_inverse is not None:
-                    c = get_text_matrix(ciphertext, m, alphabet)
-                    c = c[:, 0:m]
-
-                    if c.shape[1] == p.shape[0]:
-                        print("\nMatriks Ciphertext:\n", c)
-                        print("Matriks Plaintext:\n", p)
-
-                        input("\nTekan Enter untuk memulai serangan.")
-                        k = plaintext_attack(c, p_inverse, alphabet)
-                        kunci = matrix_to_text(k, "k", reverse_alphabet)
-
-                        print("\nKunci telah ditemukan.\n")
-                        print("Kunci yang dihasilkan: ", kunci)
-                        print("Matriks Kunci yang dihasilkan:\n", k, "\n")
-                    else:
-                        print("\nJumlah m-gram untuk plaintext dan ciphertext berbeda.\n")
-                else:
-                    print("\nMatriks plaintext yang diberikan tidak dapat dibalik.\n")
-            else:
-                print("\nPanjang plaintext harus kompatibel dengan panjang gram (m).\n")
-        elif pilihan == 4:
-            sys.exit(0)
-
-        input("Tekan Enter untuk melanjutkan.\n")
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
